@@ -1,0 +1,106 @@
+---
+title: "ESM 244 Homework 1"
+subtitle: "Task 1: Data Wrangling & Visualization (Sierra amphibians)"
+author: Natalie Mayer 
+
+format: 
+  html: 
+    code-fold: show
+    toc: true
+    number-sections: true
+    embed-resources: true
+editor: visual 
+execute:
+    echo: true
+    message: false
+    warning: false
+---
+
+Analysis of population data of mountain yellow-legged frog (Rana muscosa) observed in lentic ecosystems in the Sierra Nevada between 1995-2002
+
+```{r setup}
+# load libraries
+library(tidyverse)
+library(here)
+library(janitor)
+library(patchwork)
+library(tsibble)
+```
+
+```{r load data}
+# load data
+sierra_amphibians <- read_csv(here('data', 'sierra_amphibians.csv'))
+```
+
+```{r clean data}
+# clean data
+sierra_amphibians_df <- sierra_amphibians %>%
+  filter(amphibian_species == "RAMU", 
+         amphibian_life_stage != "EggMass") %>%
+  mutate(date = lubridate::mdy(survey_date)) %>%
+  separate(date, c('year', 'month', 'day')) %>%
+  group_by(year, amphibian_life_stage) %>%
+  ungroup()
+```
+
+```{r lifestage year graph}
+# create bar graph of populations each year grouped by life stage
+lifestage_year_graph <- ggplot(data = sierra_amphibians_df, 
+       aes(x = year, 
+           y = amphibian_number, 
+           fill = amphibian_life_stage)) + 
+  geom_col() + 
+  facet_wrap(~amphibian_life_stage, scales = "free") + 
+  theme_bw() + 
+  labs(x = "Year", 
+       y = " ", 
+       fill = "Life Stage") + 
+  theme(axis.text.x = element_text(angle = 45))
+```
+
+```{r lake graph}
+# create bar graph of total populations of adults and subadults 5 lakes with largest populations
+top_5_lakes <- sierra_amphibians_df %>%
+  select(lake_id, amphibian_life_stage, amphibian_number) %>%
+  filter(amphibian_life_stage != "Tadpole") %>%
+  group_by(lake_id) %>%
+  summarise(count = sum(amphibian_number)) %>%
+  slice_max(count, n = 5)
+
+top_5_lakes$lake <- paste('Lake', top_5_lakes$lake_id, sep = ' ')
+
+lake_graph <- ggplot(data = top_5_lakes, 
+       aes(x = reorder(lake, -count), 
+           y = count)) +
+  geom_col(fill = 'navy') +
+  theme_minimal() + 
+  labs(x = "Lake ID", 
+       y = " ")
+```
+
+```{r combine graphs}
+# combine graphs 
+final_graphs <- lifestage_year_graph / lake_graph + 
+  plot_annotation(tag_levels = 'A')
+
+
+wrap_elements(final_graphs) +
+  labs(tag = "Number of Rana muscosa", 
+       caption = "Panel A shows population trends of Mountain Yellow-Legged Frog  (Rana muscosa) by Year and Life Stage.
+Red represents adults, green subadult, and blue tadpoles observed in Sierra Nevada lentic ecosystems. Note
+the difference in magnitude in the y axes. Panel B shows the total adult and subadult Mountain Yellow-Legged
+Frogs (Rana muscosa) between 1995-2002 found in lakes in the Sierra Nevada.") +
+  theme(plot.tag.position = 'left', 
+        plot.tag = element_text(size = rel(1), angle = 90), 
+        plot.caption = element_text(hjust = 0.5))
+
+
+```
+
+## Discussion
+
+The population of all life stages of R. muscosa in Sierra Nevada lentic ecosystems increases between 1995-1997, followed by a decline and then a sharp peak in 2002. The adult population trend is bimodal, peaking at 10,595 individuals in 1997 followed by a smaller of 7,778 individuals in 2002. Counts in 1997 for subadult and tadpole R. muscosa were 5,468 and 53,247 individuals. In 2002, counts for subadult and tadpole R. muscosa were 20,076 and 155,675 individuals. Both adult and subadult populations declined between 2000-2001, whereas tadpole populations increased that year. Lake 50183 contained the largest population of R. muscosa at adult and subadult individuals between 1995-2002 of the sampled lakes in the Sierra Nevada with 2,477 total individuals sited.
+
+## Data
+
+Knapp, R.A., C. Pavelka, E.E. Hegeman, and T.C. Smith. 2020. The Sierra Lakes Inventory Project: Non-Native fish and community composition of lakes and ponds in the Sierra Nevada, California ver 2. Environmental Data Initiative. https://doi.org/10.6073/pasta/d835832d7fd00d9e4466e44eea87fab3
